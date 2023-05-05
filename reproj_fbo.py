@@ -86,9 +86,6 @@ skybox_data = np.array(
     ,dtype=np.float32
 )
 
-# Define and initialize camera rotation matrix
-camera_rotation_matrix = np.identity(3, dtype=np.float32)
-
 
 def load_cubemap(faces):
     """Load a cubemap texture from a list of image files.
@@ -183,14 +180,13 @@ def create_shader_program(vertex_shader_source, fragment_shader_source):
     return program
 
 
-def render_cubemap_image(cubemap_faces):
+def render_cubemap_image(cubemap_faces, num_samples):
     """Render a cubemap image using OpenGL.
 
     Args:
         cubemap_faces (tuple): Tuple of image file paths for the cubemap faces in the order (right, left, top, bottom, front, back).
+        num_samples: number of samples.
     """
-    global camera_rotation_matrix
-
     glutInit()
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
     glutInitWindowSize(2048, 2048)
@@ -228,36 +224,38 @@ def render_cubemap_image(cubemap_faces):
 
     cubemap_texture = load_cubemap(cubemap_faces)
 
-    glClearColor(0, 0, 0, 1.0)
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    def render(rotation_matrix, output_image_path):
+        glClearColor(0, 0, 0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-    projection_uniform = glGetUniformLocation(shader_program, "projection")
-    projection_matrix = np.identity(4, dtype=np.float32)
-    projection_matrix = perspective_projection(90, 1.0, 0.01, 100.0)
-    glUniformMatrix4fv(projection_uniform, 1, GL_FALSE, projection_matrix.transpose())
+        projection_uniform = glGetUniformLocation(shader_program, "projection")
+        projection_matrix = np.identity(4, dtype=np.float32)
+        projection_matrix = perspective_projection(90, 1.0, 0.01, 100.0)
+        glUniformMatrix4fv(projection_uniform, 1, GL_FALSE, projection_matrix.transpose())
 
-    view_uniform = glGetUniformLocation(shader_program, "view")
-    view_matrix = np.identity(4, dtype=np.float32)
-    # Apply the camera rotation
-    view_matrix[0:3, 0:3] = camera_rotation_matrix
-    glUniformMatrix4fv(view_uniform, 1, GL_FALSE, view_matrix.transpose())
+        view_uniform = glGetUniformLocation(shader_program, "view")
+        view_matrix = np.identity(4, dtype=np.float32)
+        # Apply the camera rotation
+        view_matrix[0:3, 0:3] = rotation_matrix
+        glUniformMatrix4fv(view_uniform, 1, GL_FALSE, view_matrix.transpose())
 
-    cubemap_uniform = glGetUniformLocation(shader_program, "cubemap")
-    glUniform1i(cubemap_uniform, 0)
+        cubemap_uniform = glGetUniformLocation(shader_program, "cubemap")
+        glUniform1i(cubemap_uniform, 0)
 
-    glBindVertexArray(skyboxVAO)
-    glActiveTexture(GL_TEXTURE0)
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture)
-    glDrawArrays(GL_TRIANGLES, 0, 36)
-    glBindVertexArray(0)
+        glBindVertexArray(skyboxVAO)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture)
+        glDrawArrays(GL_TRIANGLES, 0, 36)
+        glBindVertexArray(0)
 
-    # Read pixel data from the framebuffer
-    pixels = glReadPixels(0, 0, 2048, 2048, GL_RGBA, GL_UNSIGNED_BYTE)
-    # Create an image using PIL
-    image = Image.frombytes("RGBA", (2048, 2048), pixels)
-    image = image.transpose(Image.FLIP_TOP_BOTTOM)
-    # Save the image
-    image.save("/images/output.png")
+        # Read pixel data from the framebuffer
+        pixels = glReadPixels(0, 0, 2048, 2048, GL_RGBA, GL_UNSIGNED_BYTE)
+        image = Image.frombytes("RGBA", (2048, 2048), pixels)
+        image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        image.save(output_image_path)
+    
+    for i, rotation_matrix in enumerate(generate_yaw_rotations(num_samples)):
+        render(rotation_matrix, f"/images/samples_{i}.png")
 
 
 def perspective_projection(fov, aspect_ratio, near, far):
@@ -310,9 +308,58 @@ def look_at(eye, center, up):
     return view_matrix
 
 
+def generate_yaw_rotations(num_samples):
+    """Generator that yields a sequence of 3D rotation matrices representing yaw (rotation around the y-axis).
+    
+    The rotation matrices are evenly spaced over the range [0, 2pi) radians.
+
+    Args:
+        num_samples (int): The number of rotation matrices to generate.
+
+    Yields:
+        numpy.ndarray: A 3x3 rotation matrix of type float32.
+    """
+    angles = np.linspace(0, 2 * np.pi, num_samples, endpoint=False)
+
+    for angle in angles:
+        yield np.array(
+            [
+                [np.cos(angle), 0, np.sin(angle)],
+                [0, 1, 0],
+                [-np.sin(angle), 0, np.cos(angle)],
+            ],
+            dtype=np.float32,
+        )
+
+
+def generate_pitch_rotations(num_samples):
+    """Generator that yields a sequence of 3D rotation matrices representing pitch (rotation around the x-axis).
+    
+    The rotation matrices are evenly spaced over the range [0, 2pi) radians.
+
+    Args:
+        num_samples (int): The number of rotation matrices to generate.
+
+    Yields:
+        numpy.ndarray: A 3x3 rotation matrix of type float32.
+    """
+    angles = np.linspace(0, 2 * np.pi, num_samples, endpoint=False)
+
+    for angle in angles:
+        yield np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(angle), -np.sin(angle)],
+                [0, np.sin(angle), np.cos(angle)],
+            ],
+            dtype=np.float32,
+        )   
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--image_prefix", help="Prefix for the cubemap images")
+    parser.add_argument("--image_prefix", type=str, help="Prefix for the cubemap images")
+    parser.add_argument("--num_samples", type=int, help="")
     args = parser.parse_args()
 
     images = [f"{args.image_prefix}_{i}.jpg" for i in range(6)]
@@ -326,6 +373,7 @@ def main():
             images[2],  # front
             images[4],  # back
         ),
+        args.num_samples,
     )
 
 
