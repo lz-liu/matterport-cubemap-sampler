@@ -91,6 +91,14 @@ camera_rotation_matrix = np.identity(3, dtype=np.float32)
 
 
 def load_cubemap(faces):
+    """Load a cubemap texture from a list of image files.
+
+    Args:
+        faces (tuple): Tuple of image file paths for the cubemap faces in the order (right, left, top, bottom, front, back).
+
+    Returns:
+        int: Texture ID of the loaded cubemap.
+    """
     texture_id = glGenTextures(1)
     glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id)
 
@@ -125,6 +133,15 @@ def load_cubemap(faces):
 
 
 def compile_shader(shader_type, shader_source):
+    """Compile a shader from its source code.
+
+    Args:
+        shader_type (int): Type of the shader (e.g., GL_VERTEX_SHADER or GL_FRAGMENT_SHADER).
+        shader_source (str): Source code of the shader.
+
+    Returns:
+        int: Compiled shader object.
+    """
     shader = glCreateShader(shader_type)
     glShaderSource(shader, shader_source)
     glCompileShader(shader)
@@ -138,6 +155,15 @@ def compile_shader(shader_type, shader_source):
 
 
 def create_shader_program(vertex_shader_source, fragment_shader_source):
+    """Create a shader program from vertex and fragment shader source codes.
+
+    Args:
+        vertex_shader_source (str): Source code of the vertex shader.
+        fragment_shader_source (str): Source code of the fragment shader.
+
+    Returns:
+        int: Compiled shader program.
+    """
     vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader_source)
     fragment_shader = compile_shader(GL_FRAGMENT_SHADER, fragment_shader_source)
 
@@ -158,6 +184,11 @@ def create_shader_program(vertex_shader_source, fragment_shader_source):
 
 
 def render_cubemap_image(cubemap_faces):
+    """Render a cubemap image using OpenGL.
+
+    Args:
+        cubemap_faces (tuple): Tuple of image file paths for the cubemap faces in the order (right, left, top, bottom, front, back).
+    """
     global camera_rotation_matrix
 
     glutInit()
@@ -230,6 +261,17 @@ def render_cubemap_image(cubemap_faces):
 
 
 def perspective_projection(fov, aspect_ratio, near, far):
+    """Create a perspective projection matrix.
+
+    Args:
+        fov (float): Field of view angle in degrees.
+        aspect_ratio (float): Aspect ratio of the viewport.
+        near (float): Distance to the near clipping plane.
+        far (float): Distance to the far clipping plane.
+
+    Returns:
+        numpy.ndarray: Perspective projection matrix.
+    """
     projection_matrix = np.zeros((4, 4), dtype=np.float32)
     f = 1.0 / np.tan(np.radians(fov) / 2.0)
     projection_matrix[0, 0] = f / aspect_ratio
@@ -240,19 +282,17 @@ def perspective_projection(fov, aspect_ratio, near, far):
     return projection_matrix
 
 
-def orthographic_projection(left, right, bottom, top, near, far):
-    projection_matrix = np.zeros((4, 4), dtype=np.float32)
-    projection_matrix[0, 0] = 2.0 / (right - left)
-    projection_matrix[1, 1] = 2.0 / (top - bottom)
-    projection_matrix[2, 2] = -2.0 / (far - near)
-    projection_matrix[3, 0] = -(right + left) / (right - left)
-    projection_matrix[3, 1] = -(top + bottom) / (top - bottom)
-    projection_matrix[3, 2] = -(far + near) / (far - near)
-    projection_matrix[3, 3] = 1.0
-    return projection_matrix
-
-
 def look_at(eye, center, up):
+    """Create a view matrix that simulates a camera looking at a specific point.
+
+    Args:
+        eye (numpy.ndarray): Position of the camera.
+        center (numpy.ndarray): Point the camera is looking at.
+        up (numpy.ndarray): Up vector defining the camera's orientation.
+
+    Returns:
+        numpy.ndarray: View matrix.
+    """
     forward = center - eye
     forward /= np.linalg.norm(forward)
 
