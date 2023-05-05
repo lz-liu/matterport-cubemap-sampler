@@ -96,7 +96,6 @@ def load_cubemap(faces):
 
     for i, face in enumerate(faces):
         img = Image.open(face)
-        img = img.transpose(Image.FLIP_TOP_BOTTOM)
         if i == 2:
             # Rotate the bottom image 90 degress clockwise.
             img = img.rotate(-90)
@@ -158,7 +157,7 @@ def create_shader_program(vertex_shader_source, fragment_shader_source):
     return program
 
 
-def render_cubemap_image(cubemap_faces, camera_position):
+def render_cubemap_image(cubemap_faces):
     global camera_rotation_matrix
 
     glutInit()
@@ -203,13 +202,11 @@ def render_cubemap_image(cubemap_faces, camera_position):
 
     projection_uniform = glGetUniformLocation(shader_program, "projection")
     projection_matrix = np.identity(4, dtype=np.float32)
-    projection_matrix = perspective_projection(30, 1.0, 0.01, 10.0)
+    projection_matrix = perspective_projection(90, 1.0, 0.01, 100.0)
     glUniformMatrix4fv(projection_uniform, 1, GL_FALSE, projection_matrix.transpose())
 
     view_uniform = glGetUniformLocation(shader_program, "view")
     view_matrix = np.identity(4, dtype=np.float32)
-    # Translate the view matrix to the negative camera position
-    view_matrix[3, 0:3] = -camera_position
     # Apply the camera rotation
     view_matrix[0:3, 0:3] = camera_rotation_matrix
     glUniformMatrix4fv(view_uniform, 1, GL_FALSE, view_matrix.transpose())
@@ -234,7 +231,7 @@ def render_cubemap_image(cubemap_faces, camera_position):
 
 def perspective_projection(fov, aspect_ratio, near, far):
     projection_matrix = np.zeros((4, 4), dtype=np.float32)
-    f = 1.0 / np.tan(fov / 2.0)
+    f = 1.0 / np.tan(np.radians(fov) / 2.0)
     projection_matrix[0, 0] = f / aspect_ratio
     projection_matrix[1, 1] = f
     projection_matrix[2, 2] = (far + near) / (near - far)
@@ -280,19 +277,15 @@ def main():
 
     images = [f"{args.image_prefix}_{i}.jpg" for i in range(6)]
 
-    camera_position = np.array([0, 0, 0], dtype=np.float32)
-    # camera_rotation_matrix = np.identity(3, dtype=np.float32)
-
     render_cubemap_image(
         (
             images[3],  # right
             images[1],  # left
-            images[5],  # bottom
             images[0],  # top
+            images[5],  # bottom
             images[2],  # front
             images[4],  # back
         ),
-        camera_position,
     )
 
 
